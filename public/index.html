@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Litoral Seleto — Estadias de praia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0e2a35;--sand:#efe6d6;--sand-2:#e2d5bd;--coral:#c1613f;--ink:#1b2426;--paper:#fbf8f2;--good:#3d6b4f;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.55;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  header{background:var(--navy);color:var(--sand);padding:48px 24px;text-align:center;}
+  header h1{font-size:clamp(28px,6vw,46px);color:#fbf3e6;margin-bottom:10px;}
+  header p{color:#c9d8dc;font-size:15px;}
+  .demo-tag{display:inline-block;background:#c1613f;color:#fff;font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:20px;margin-bottom:14px;letter-spacing:.03em;}
+  main{max-width:900px;margin:0 auto;padding:40px 20px 80px;}
+
+  .guest-box{background:var(--sand);border:1px solid var(--sand-2);border-radius:10px;padding:20px;margin-bottom:36px;}
+  .guest-box.hidden{display:none;}
+  .guest-box .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .guest-box input{flex:1;min-width:160px;padding:9px 10px;border:1px solid var(--sand-2);border-radius:6px;font-size:14px;}
+  .guest-box button{background:var(--navy);color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:14px;}
+  .guest-ok{display:none;font-size:13.5px;color:var(--good);}
+
+  .hotel{border-top:1px solid var(--sand-2);padding:32px 0;}
+  .hotel:first-of-type{border-top:none;}
+  .hotel h2{font-size:22px;}
+  .hotel .meta{color:var(--coral);font-size:13px;margin:4px 0 10px;}
+  .hotel p.desc{font-size:14.5px;color:#333c3d;margin:0 0 14px;max-width:64ch;}
+  .btn-book{background:var(--navy);color:var(--sand);border:none;padding:9px 18px;border-radius:6px;font-size:14px;}
+
+  .book-panel{display:none;margin-top:16px;background:var(--sand);border:1px solid var(--sand-2);border-radius:10px;padding:20px;}
+  .book-panel.open{display:block;}
+  .book-panel .row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .book-panel label{display:flex;flex-direction:column;font-size:12.5px;gap:5px;flex:1;min-width:130px;}
+  .book-panel input,.book-panel select{padding:8px;border:1px solid var(--sand-2);border-radius:6px;font-size:14px;background:#fff;}
+  .price-line{font-size:14px;margin:8px 0 12px;}
+  .btn-confirm{background:var(--coral);color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:14px;}
+  .confirm-msg{display:none;background:#e6efe8;border:1px solid var(--good);color:#274b34;padding:10px 14px;border-radius:8px;font-size:13.5px;margin-top:10px;}
+  .confirm-msg.show{display:block;}
+
+  .reservations{margin-top:56px;}
+  .res-card{background:#fff;border:1px solid var(--sand-2);border-radius:10px;padding:14px 16px;margin-bottom:10px;font-size:13.5px;}
+  .empty{font-style:italic;color:#8b8f88;font-size:13.5px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="demo-tag">MODO DEMONSTRAÇÃO</div>
+  <h1>Litoral Seleto</h1>
+  <p>Dados carregados do banco de dados em tempo real.</p>
+</header>
+
+<main>
+  <div class="guest-box" id="guest-box">
+    <h3 style="font-size:16px;margin-bottom:10px;">Identifique-se para reservar</h3>
+    <div class="row">
+      <input id="g-name" placeholder="Seu nome">
+      <input id="g-email" placeholder="Seu e-mail">
+    </div>
+    <button id="g-save">Continuar</button>
+    <div class="guest-ok" id="g-ok">Identificado! Já pode reservar.</div>
+  </div>
+
+  <div id="hotel-list"><p class="empty">Carregando hotéis...</p></div>
+
+  <div class="reservations">
+    <h3 style="font-size:20px;">Minhas reservas</h3>
+    <div id="res-list"><p class="empty">Identifique-se acima para ver suas reservas.</p></div>
+  </div>
+</main>
+
+<script>
+const API = ''; // mesma origem (o próprio servidor Node serve este arquivo)
+let guestId = localStorage.getItem('ls-guest-id');
+let guestName = localStorage.getItem('ls-guest-name');
+
+function showGuestState(){
+  if(guestId){
+    document.getElementById('g-ok').style.display = 'block';
+    document.getElementById('g-ok').textContent = `Identificado como ${guestName}. Já pode reservar.`;
+    carregarReservas();
+  }
+}
+showGuestState();
+
+document.getElementById('g-save').addEventListener('click', async ()=>{
+  const name = document.getElementById('g-name').value.trim();
+  const email = document.getElementById('g-email').value.trim();
+  if(!name || !email){ alert('Preencha nome e e-mail.'); return; }
+  try{
+    const r = await fetch(`${API}/convidado`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, email })
+    });
+    const data = await r.json();
+    guestId = data.id; guestName = name;
+    localStorage.setItem('ls-guest-id', guestId);
+    localStorage.setItem('ls-guest-name', name);
+    showGuestState();
+  }catch(err){ console.error(err); alert('Erro ao identificar. Veja o console do servidor.'); }
+});
+
+// ---------- Hotéis ----------
+async function carregarHoteis(){
+  const wrap = document.getElementById('hotel-list');
+  try{
+    const r = await fetch(`${API}/hoteis`);
+    const hoteis = await r.json();
+    if(!hoteis.length){ wrap.innerHTML = '<p class="empty">Nenhum hotel cadastrado ainda no banco.</p>'; return; }
+    wrap.innerHTML = '';
+    hoteis.forEach(h => wrap.appendChild(renderHotelCard(h)));
+  }catch(err){
+    console.error(err);
+    wrap.innerHTML = '<p class="empty">Não foi possível carregar os hotéis (veja o console).</p>';
+  }
+}
+
+function renderHotelCard(h){
+  const el = document.createElement('div');
+  el.className = 'hotel';
+  el.innerHTML = `
+    <h2>${h.name}</h2>
+    <div class="meta">${'★'.repeat(h.stars)} · ${h.city}, ${h.country}${h.rating ? ' · nota ' + h.rating : ''}</div>
+    <p class="desc">${h.description || ''}</p>
+    <button class="btn-book" data-id="${h.id}">Reservar</button>
+    <div class="book-panel" id="panel-${h.id}"></div>
+  `;
+  el.querySelector('.btn-book').addEventListener('click', () => abrirPainel(h.id));
+  return el;
+}
+
+async function abrirPainel(hotelId){
+  const panel = document.getElementById(`panel-${hotelId}`);
+  const aberto = panel.classList.contains('open');
+  document.querySelectorAll('.book-panel.open').forEach(p => p.classList.remove('open'));
+  if(aberto) return;
+
+  if(!panel.dataset.loaded){
+    const r = await fetch(`${API}/hoteis/${hotelId}/quartos`);
+    const quartos = await r.json();
+    if(!quartos.length){
+      panel.innerHTML = '<p class="empty">Nenhum quarto cadastrado para este hotel ainda.</p>';
+    }else{
+      const opts = quartos.map(q => `<option value="${q.id}" data-price="${q.price}">${q.name} — R$ ${q.price}/noite</option>`).join('');
+      panel.innerHTML = `
+        <div class="row">
+          <label>Check-in<input type="date" class="in"></label>
+          <label>Check-out<input type="date" class="out"></label>
+          <label>Hóspedes<input type="number" class="guests" min="1" value="2"></label>
+          <label>Quarto<select class="room">${opts}</select></label>
+        </div>
+        <div class="price-line">Selecione as datas para ver o valor.</div>
+        <button class="btn-confirm">Confirmar pedido de reserva</button>
+        <div class="confirm-msg"></div>
+      `;
+      const calc = () => {
+        const inp = panel.querySelector('.in').value, out = panel.querySelector('.out').value;
+        const priceLine = panel.querySelector('.price-line');
+        const roomSel = panel.querySelector('.room');
+        const price = Number(roomSel.selectedOptions[0].dataset.price);
+        if(!inp || !out){ priceLine.textContent = 'Selecione as datas para ver o valor.'; return null; }
+        const nights = Math.round((new Date(out) - new Date(inp)) / 86400000);
+        if(nights <= 0){ priceLine.textContent = 'Check-out deve ser depois do check-in.'; return null; }
+        const total = nights * price;
+        priceLine.innerHTML = `${nights} noite(s) × R$ ${price} — <strong>R$ ${total.toLocaleString('pt-BR')}</strong> (estimado)`;
+        return { nights, total, roomId: roomSel.value };
+      };
+      panel.querySelectorAll('.in,.out,.room').forEach(elm => elm.addEventListener('change', calc));
+      panel.querySelector('.btn-confirm').addEventListener('click', async () => {
+        if(!guestId){ alert('Preencha seu nome e e-mail no topo da página primeiro.'); return; }
+        const result = calc();
+        if(!result) return;
+        const guests = panel.querySelector('.guests').value;
+        const check_in = panel.querySelector('.in').value;
+        const check_out = panel.querySelector('.out').value;
+        try{
+          const r2 = await fetch(`${API}/reservas`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              user_id: guestId, hotel_id: hotelId, room_id: result.roomId,
+              check_in, check_out, guests: Number(guests), rooms: 1, total_price: result.total
+            })
+          });
+          if(!r2.ok){ const e = await r2.json(); throw new Error(e.error || 'Erro'); }
+          const msg = panel.querySelector('.confirm-msg');
+          msg.textContent = 'Pedido de reserva registrado! Veja em "Minhas reservas" abaixo.';
+          msg.classList.add('show');
+          carregarReservas();
+        }catch(err){ console.error(err); alert('Erro ao reservar: ' + err.message); }
+      });
+    }
+    panel.dataset.loaded = '1';
+  }
+  panel.classList.add('open');
+}
+
+// ---------- Minhas reservas ----------
+async function carregarReservas(){
+  if(!guestId) return;
+  const wrap = document.getElementById('res-list');
+  try{
+    const r = await fetch(`${API}/reservas/${guestId}`);
+    const reservas = await r.json();
+    if(!reservas.length){ wrap.innerHTML = '<p class="empty">Nenhuma reserva ainda.</p>'; return; }
+    wrap.innerHTML = reservas.map(res => `
+      <div class="res-card">
+        <strong>${res.hotel_name}</strong> — ${res.room_name}<br>
+        ${res.check_in?.slice(0,10)} → ${res.check_out?.slice(0,10)} · ${res.guests} hóspede(s) · R$ ${Number(res.total_price).toLocaleString('pt-BR')}<br>
+        Status: ${res.status} · Pagamento: ${res.payment_status || 'PENDING'}
+      </div>
+    `).join('');
+  }catch(err){ console.error(err); }
+}
+
+carregarHoteis();
+</script>
+</body>
+</html>
